@@ -77,18 +77,36 @@ public class Main {
             abrirNavegador();
         });
 
-        proximo.addActionListener(e -> {
-            if (verificarEpisodioExistente(temporada, episodio + 1)) {
-                episodio++;
-            } else {
-                JOptionPane.showMessageDialog(frame, "O episódio " + (episodio + 1) + " não existe, verificando próxima temporada.");
-                temporada++;
-                episodio = 1;
+        Action avancarEpisodioAction = new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                if (verificarEpisodioExistente(temporada, episodio + 1)) {
+                    episodio++;
+                } else {
+                    int totalEp = episodio;
+                    SwingUtilities.invokeLater(() -> 
+                        JOptionPane.showMessageDialog(frame, "Fim da temporada " + temporada + " com " + totalEp + " episódios")
+                    );
+                    temporada++;
+                    episodio = 1;
+                }
+                salvarDados();
+                atualizarLabel(info);
+                abrirNavegador();
             }
-            salvarDados();
-            atualizarLabel(info);
-            abrirNavegador();
-        });
+        };
+
+        // Associa a ação ao botão
+        proximo.addActionListener(avancarEpisodioAction);
+
+        // Associa a mesma ação a uma tecla (Ctrl + Seta Direita)
+        InputMap inputMap = frame.getRootPane().getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW);
+        ActionMap actionMap = frame.getRootPane().getActionMap();
+
+        KeyStroke keyStroke = KeyStroke.getKeyStroke(KeyEvent.VK_RIGHT, InputEvent.CTRL_DOWN_MASK);
+        inputMap.put(keyStroke, "avancarEpisodio");
+        actionMap.put("avancarEpisodio", avancarEpisodioAction);
+        
 
         definirLink.addActionListener(e -> {
             baseUrl = JOptionPane.showInputDialog("Cole o link base da série:");
