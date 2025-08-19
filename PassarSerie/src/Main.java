@@ -11,20 +11,27 @@ public class Main {
     private static int episodio = 1;
     private static String modo = "dub"; // pode ser "dub" ou "sub"
     private static final File saveFile = new File("serie.txt");
+    private static final File configFile = new File("configs.txt");
 
     public static void main(String[] args) {
+    	verificaFicheiros();
         carregarDados();
+        
 
         JFrame frame = new JFrame("Navegador de Episódios");
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        frame.setSize(1920, 1080);
-        frame.setMinimumSize(new Dimension(800, 600));
-        frame.setMaximumSize(new Dimension(1920, 1080));
+
+        // Faz abrir sempre em tela cheia
+        frame.setExtendedState(JFrame.MAXIMIZED_BOTH);
+        frame.setUndecorated(true); // opcional, sem barra de título
+
         frame.setLayout(new BorderLayout(10, 10));
 
         JPanel mainPanel = new JPanel(new GridBagLayout());
         mainPanel.setPreferredSize(new Dimension(1200, 800));
-        mainPanel.setMaximumSize(new Dimension(1920, 1080));
+
+        frame.add(mainPanel, BorderLayout.CENTER);
+        frame.setVisible(true);
 
         GridBagConstraints gbc = new GridBagConstraints();
         gbc.fill = GridBagConstraints.BOTH;
@@ -39,16 +46,52 @@ public class Main {
         JTextField inputTemporada = new JTextField(String.valueOf(temporada));
         JTextField inputEpisodio = new JTextField(String.valueOf(episodio));
         JTextField inputLink = new JTextField(baseUrl);
+ 
+        JButton botaoFechar = new JButton("X");
+        botaoFechar.setPreferredSize(new Dimension(80, 30));
+        botaoFechar.setFont(new Font("Arial", Font.BOLD, 18));
+        botaoFechar.setForeground(Color.RED);
+        botaoFechar.setFocusPainted(false);
+        botaoFechar.setContentAreaFilled(false);
+        botaoFechar.setBorderPainted(false);
+        botaoFechar.setOpaque(false);
+        botaoFechar.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        botaoFechar.addActionListener(e -> System.exit(0));
 
+        JButton botaoMinimizar = new JButton("_");
+        botaoMinimizar.setPreferredSize(new Dimension(45, 18));
+        botaoMinimizar.setFont(new Font("Arial", Font.BOLD, 18));
+        botaoMinimizar.setForeground(Color.BLACK);
+        botaoMinimizar.setFocusPainted(false);
+        botaoMinimizar.setContentAreaFilled(false);
+        botaoMinimizar.setBorderPainted(false);
+        botaoMinimizar.setOpaque(false);
+        botaoMinimizar.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        botaoMinimizar.addActionListener(e -> frame.setState(Frame.ICONIFIED));
+        
+
+        
+        JPanel painelTopo = new JPanel(new FlowLayout(FlowLayout.RIGHT, 0, 0));
+        painelTopo.setOpaque(false); // deixa transparente
+
+        painelTopo.add(botaoMinimizar);
+        painelTopo.add(botaoFechar);
+        frame.add(painelTopo, BorderLayout.NORTH);
+        
+        //JButton fecharPrograma = new JButton("X");
         JButton abrirAtual = new JButton("Abrir Episódio Atual");
-        JButton anterior = new JButton("Anterior");
-        JButton proximo = new JButton("Próximo");
+        JButton anterior = new JButton("Ver anterior");
+        JButton proximo = new JButton("Ver próximo");
+        JButton voltarEP = new JButton("Voltar Episodio(sem abrir navegador)");
+        JButton passarEp = new JButton("Passar Episodio(sem abrir navegador)");
         JButton definirLink = new JButton("Definir Link da Série");
         JButton inserirEpisodio = new JButton("Inserir Episódio Manualmente");
 
-        JButton[] botoes = {abrirAtual, anterior, proximo, definirLink, inserirEpisodio};
+        JButton[] botoes = {abrirAtual, anterior, proximo, voltarEP, passarEp, definirLink, inserirEpisodio};
         Color[] cores = {
             new Color(200, 200, 255),
+            new Color(255, 100, 100),
+            new Color(100, 255, 100),
             new Color(255, 100, 100),
             new Color(100, 255, 100),
             new Color(100, 100, 255),
@@ -70,7 +113,17 @@ public class Main {
                 episodio--;
             } else if (temporada > 1) {
                 temporada--;
-                episodio = 1;
+                int ep = 1;
+                
+                while (true) {
+                    if (!verificarEpisodioExistente(temporada, ep)) {
+                        episodio = ep - 1;  // último episódio existente
+                        if (episodio < 1) episodio = 1; // caso não encontre nenhum
+                        break;
+                    }
+                    ep++;
+                }
+            
             }
             salvarDados();
             atualizarLabel(info);
@@ -83,21 +136,91 @@ public class Main {
                 if (verificarEpisodioExistente(temporada, episodio + 1)) {
                     episodio++;
                 } else {
-                    int totalEp = episodio;
-                    SwingUtilities.invokeLater(() -> 
-                        JOptionPane.showMessageDialog(frame, "Fim da temporada " + temporada + " com " + totalEp + " episódios")
-                    );
-                    temporada++;
-                    episodio = 1;
+                   
+
+                    // Verifica se existe episódio 1 da próxima temporada
+                    int proxTemporada = temporada + 1;
+                    if (verificarEpisodioExistente(proxTemporada, 1)) {
+                    	int totalEp = episodio;
+                        SwingUtilities.invokeLater(() -> 
+                            JOptionPane.showMessageDialog(frame, "Fim da temporada " + temporada + " com " + totalEp + " episódios")
+                        );
+                        temporada = proxTemporada;
+                        episodio = 1;
+                        
+                    } else {
+                        SwingUtilities.invokeLater(() -> 
+                            JOptionPane.showMessageDialog(frame, "Não existem mais episódios disponíveis!")
+                        );
+                    }
                 }
                 salvarDados();
                 atualizarLabel(info);
                 abrirNavegador();
+                
             }
         };
 
+
         // Associa a ação ao botão
         proximo.addActionListener(avancarEpisodioAction);
+        
+        Action passarEpAction = new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                if (verificarEpisodioExistente(temporada, episodio + 1)) {
+                    episodio++;
+                } else {
+
+                    // Verifica se existe episódio 1 da próxima temporada
+                    int proxTemporada = temporada + 1;
+                    if (verificarEpisodioExistente(proxTemporada, 1)) {
+                    	int totalEp = episodio;
+                        SwingUtilities.invokeLater(() -> 
+                            JOptionPane.showMessageDialog(frame, "Fim da temporada " + temporada + " com " + totalEp + " episódios")
+                        );
+                        temporada = proxTemporada;
+                        episodio = 1;
+                       
+                    } else {
+                        SwingUtilities.invokeLater(() -> 
+                            JOptionPane.showMessageDialog(frame, "Não existem mais episódios disponíveis!")
+                        );
+                    }
+                }
+                salvarDados();
+                atualizarLabel(info);
+            }
+        };
+        
+        //açao de apenas passar ep,sem abrir no navegador
+        passarEp.addActionListener(passarEpAction);
+        
+        
+        Action voltarEPAction = new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+            	if (episodio > 1) {
+                    episodio--;
+                } else if (temporada > 1) {
+                    temporada--;
+                    int ep = 1;
+                    while (true) {
+                        if (!verificarEpisodioExistente(temporada, ep)) {
+                            episodio = ep - 1;  // último episódio existente
+                            if (episodio < 1) episodio = 1; // caso não encontre nenhum
+                            break;
+                        }
+                        ep++;
+                    }
+                }
+                salvarDados();
+                atualizarLabel(info);
+            }
+        };
+        
+        //açao de apenas passar ep,sem abrir no navegador
+        voltarEP.addActionListener(voltarEPAction);
 
         // Associa a mesma ação a uma tecla (Ctrl + Seta Direita)
         InputMap inputMap = frame.getRootPane().getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW);
@@ -119,16 +242,27 @@ public class Main {
 
         inserirEpisodio.addActionListener(e -> {
             try {
-                temporada = Integer.parseInt(inputTemporada.getText());
-                episodio = Integer.parseInt(inputEpisodio.getText());
+                int temporadaInserido = Integer.parseInt(inputTemporada.getText());
+                int episodioInserido = Integer.parseInt(inputEpisodio.getText());
                 baseUrl = inputLink.getText();
+                
+                if (verificarEpisodioExistente(temporadaInserido, episodioInserido)) {
+                    temporada = temporadaInserido;
+                    episodio = episodioInserido;
+                } else {
+                    SwingUtilities.invokeLater(() -> 
+                        JOptionPane.showMessageDialog(frame, "Não existe este episódio inserido")
+                    );
+                }
+                
                 salvarDados();
                 atualizarLabel(info);
-                abrirNavegador();
+                
             } catch (NumberFormatException ex) {
                 JOptionPane.showMessageDialog(frame, "Por favor, insira números válidos.");
             }
         });
+
 
         // Adicionando os componentes ao layout
         gbc.gridx = 0; gbc.gridy = 0; gbc.gridwidth = 3; mainPanel.add(info, gbc);
@@ -141,6 +275,10 @@ public class Main {
         gbc.gridx = 1; mainPanel.add(inputEpisodio, gbc);
         gbc.gridy++; gbc.gridx = 0; mainPanel.add(anterior, gbc);
         gbc.gridx = 1; mainPanel.add(proximo, gbc);
+        gbc.gridy++;
+        gbc.gridx = 0; mainPanel.add(voltarEP, gbc);
+        gbc.gridx = 1; mainPanel.add(passarEp, gbc);
+        
         gbc.gridy++; gbc.gridx = 0; mainPanel.add(definirLink, gbc);
         gbc.gridx = 1; mainPanel.add(inserirEpisodio, gbc);
 
@@ -148,7 +286,9 @@ public class Main {
         frame.setVisible(true);
     }
 
+    
     private static void atualizarLabel(JLabel label) {
+    	
         label.setText("Temporada: " + temporada + " | Episódio: " + episodio + " | Link base: " + baseUrl);
     }
 
@@ -171,6 +311,10 @@ public class Main {
             e.printStackTrace();
         }
     }
+    
+   
+    
+    
 
     private static void abrirNavegador() {
         if (baseUrl.isEmpty()) return;
@@ -183,6 +327,7 @@ public class Main {
             e.printStackTrace();
         }
     }
+    
 
     private static void gerarHTMLRedirect(String url) {
         String htmlContent = "<html><head><meta http-equiv='refresh' content='0; url=" + url + "' /></head><body></body></html>";
@@ -204,6 +349,37 @@ public class Main {
             System.err.println("Erro ao verificar episódio: " + e.getMessage());
             e.printStackTrace();
             return false;
+        }
+    }
+    
+    private static void verificaFicheiros() {
+        try {
+            if (!saveFile.exists()) {
+                boolean criado = saveFile.createNewFile();
+                if (criado) {
+                    System.out.println("Arquivo serie.txt criado.");
+                }
+            }
+            if (!configFile.exists()) {
+                // Cria o arquivo com dados iniciais, cada dado em uma linha
+                try (BufferedWriter writer = new BufferedWriter(new FileWriter(configFile))) {
+                    writer.write("branco\n");//por defeito cria com tema branco
+                }
+                System.out.println("Arquivo configFile criado com dados iniciais.");
+            } else {
+                // Lê o arquivo linha a linha e imprime o conteúdo
+                try (BufferedReader reader = new BufferedReader(new FileReader(configFile))) {
+                    String linha;
+                    while ((linha = reader.readLine()) != null) {
+                        if (!linha.trim().isEmpty()) {
+                            //System.out.println(linha.trim());
+                        }
+                    }
+                }
+            }
+        } catch (IOException e) {
+            System.err.println("Erro ao verificar/criar arquivos: " + e.getMessage());
+            e.printStackTrace();
         }
     }
 }
